@@ -112,7 +112,7 @@ describe('Autosuggest with highlightFirstSuggestion={true}', () => {
   describe('inputProps.onChange', () => {
     it('should be called once with the right parameters when Enter is pressed after autohighlight', () => {
       focusAndSetInputValue('p');
-      onChange.reset();
+      onChange.resetHistory();
       clickEnter();
       expect(onChange).to.have.been.calledOnce;
       expect(onChange).to.be.calledWith(syntheticEventMatcher, {
@@ -125,28 +125,39 @@ describe('Autosuggest with highlightFirstSuggestion={true}', () => {
   describe('onSuggestionSelected', () => {
     it('should be called once with the right parameters when Enter is pressed after autohighlight', () => {
       focusAndSetInputValue('p');
-      onSuggestionSelected.reset();
+      onSuggestionSelected.resetHistory();
       clickEnter();
       expect(onSuggestionSelected).to.have.been.calledOnce;
-      expect(
-        onSuggestionSelected
-      ).to.have.been.calledWithExactly(syntheticEventMatcher, {
-        suggestion: { name: 'Perl', year: 1987 },
-        suggestionValue: 'Perl',
-        suggestionIndex: 0,
-        sectionIndex: null,
-        method: 'enter'
-      });
+      expect(onSuggestionSelected).to.have.been.calledWithExactly(
+        syntheticEventMatcher,
+        {
+          suggestion: { name: 'Perl', year: 1987 },
+          suggestionValue: 'Perl',
+          suggestionIndex: 0,
+          sectionIndex: null,
+          method: 'enter'
+        }
+      );
     });
   });
 
   describe('onSuggestionHighlighted', () => {
     it('should be called once with the highlighed suggestion when the first suggestion is autohighlighted', () => {
-      onSuggestionHighlighted.reset();
+      onSuggestionHighlighted.resetHistory();
       focusAndSetInputValue('p');
       expect(onSuggestionHighlighted).to.have.been.calledOnce;
       expect(onSuggestionHighlighted).to.have.been.calledWithExactly({
         suggestion: { name: 'Perl', year: 1987 }
+      });
+    });
+
+    it('should be called once with the new suggestion when typing more changes the autohighlighted suggestion', () => {
+      focusAndSetInputValue('c');
+      onSuggestionHighlighted.resetHistory();
+      focusAndSetInputValue('c+');
+      expect(onSuggestionHighlighted).to.have.been.calledOnce;
+      expect(onSuggestionHighlighted).to.have.been.calledWithExactly({
+        suggestion: { name: 'C++', year: 1983 }
       });
     });
   });

@@ -1,7 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import SyntheticEvent from 'react-dom/lib/SyntheticEvent';
+import ReactDom from 'react-dom';
 import TestUtils, { Simulate } from 'react-dom/test-utils';
 
 chai.use(sinonChai);
@@ -39,7 +39,19 @@ export const init = application => {
   clearButton = TestUtils.scryRenderedDOMComponentsWithTag(app, 'button')[0];
 };
 
-export const syntheticEventMatcher = sinon.match.instanceOf(SyntheticEvent);
+// Since react-dom doesn't export SyntheticEvent anymore
+export const syntheticEventMatcher = sinon.match(value => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const proto = Object.getPrototypeOf(value);
+
+  if ('_dispatchListeners' in value && proto && proto.constructor.Interface) {
+    return true;
+  }
+  return false;
+}, 'of SyntheticEvent type');
 export const childrenMatcher = sinon.match.any;
 export const containerPropsMatcher = sinon.match({
   id: sinon.match.string,
@@ -92,11 +104,13 @@ export const getSuggestion = suggestionIndex => {
     throw Error(
       `
       Cannot find suggestion #${suggestionIndex}.
-      ${suggestions.length === 0
-        ? 'No suggestions found.'
-        : `Only ${suggestions.length} suggestion${suggestions.length === 1
-            ? ''
-            : 's'} found.`}
+      ${
+        suggestions.length === 0
+          ? 'No suggestions found.'
+          : `Only ${suggestions.length} suggestion${
+              suggestions.length === 1 ? '' : 's'
+            } found.`
+      }
     `
     );
   }
@@ -179,6 +193,30 @@ const mouseDownDocument = target => {
   );
 };
 
+export const mouseUpDocument = target => {
+  document.dispatchEvent(
+    new window.CustomEvent(
+      'mouseup',
+      target
+        ? {
+            detail: {
+              // must be 'detail' accoring to docs: https://developer.mozilla.org/en-US/docs/Web/Guide/Events/Creating_and_triggering_events#Adding_custom_data_–_CustomEvent()
+              target
+            }
+          }
+        : null
+    )
+  );
+};
+
+const touchStartSuggestion = suggestionIndex => {
+  Simulate.touchStart(getSuggestion(suggestionIndex));
+};
+
+const touchMoveSuggestion = suggestionIndex => {
+  Simulate.touchMove(getSuggestion(suggestionIndex));
+};
+
 // It doesn't feel right to emulate all the DOM events by copying the implementation.
 // Please show me a better way to emulate this.
 export const clickSuggestion = suggestionIndex => {
@@ -187,10 +225,46 @@ export const clickSuggestion = suggestionIndex => {
   mouseEnterSuggestion(suggestionIndex);
   mouseDownDocument(suggestion);
   mouseDownSuggestion(suggestionIndex);
+  mouseUpDocument(suggestion);
   blurInput();
   focusInput();
   Simulate.click(suggestion);
   clock.tick(1);
+};
+
+// Simulates only mouse events since on touch devices dragging considered as a scroll and is a different case.
+export const dragSuggestionOut = suggestionIndex => {
+  const suggestion = getSuggestion(suggestionIndex);
+
+  mouseEnterSuggestion(suggestionIndex);
+  mouseDownDocument(suggestion);
+  mouseDownSuggestion(suggestionIndex);
+  mouseLeaveSuggestion(suggestionIndex);
+  mouseUpDocument();
+};
+
+export const dragSuggestionOutAndIn = suggestionIndex => {
+  const suggestion = getSuggestion(suggestionIndex);
+
+  mouseEnterSuggestion(suggestionIndex);
+  mouseDownDocument(suggestion);
+  mouseDownSuggestion(suggestionIndex);
+  mouseLeaveSuggestion(suggestionIndex);
+  mouseEnterSuggestion(suggestionIndex);
+  mouseUpDocument();
+  blurInput();
+  focusInput();
+  Simulate.click(suggestion);
+  clock.tick(1);
+};
+
+// Simulates mouse events as well as touch events since some browsers (chrome) mirror them and we should handle this.
+// Order of events is implemented according to docs: https://developer.mozilla.org/en-US/docs/Web/API/Touch_events/Supporting_both_TouchEvent_and_MouseEvent
+export const dragSuggestionOutTouch = suggestionIndex => {
+  touchStartSuggestion(suggestionIndex);
+  touchMoveSuggestion(suggestionIndex);
+  mouseDownSuggestion(suggestionIndex);
+  mouseUpDocument();
 };
 
 export const clickSuggestionsContainer = () => {
@@ -257,4 +331,9 @@ export const clickClearButton = () => {
   } else {
     throw new Error("Clear button doesn't exist");
   }
+};
+
+export const unmountApp = () => {
+  // eslint-disable-next-line react/no-find-dom-node
+  ReactDom.unmountComponentAtNode(ReactDom.findDOMNode(app).parentNode);
 };
